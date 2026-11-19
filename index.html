@@ -1,257 +1,152 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>やまびこ文字起こし</title>
-  <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-    body {
-      font-family: system-ui, -apple-system, sans-serif;
-      background-color: #121212;
-      color: #e0e0e0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      min-height: 100vh;
-      padding: 20px;
-    }
-    .container {
-      width: 100%;
-      max-width: 600px;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-    h1 {
-      font-size: 1.4rem;
-      text-align: center;
-      color: #00e676;
-    }
-    .status-bar {
-      text-align: center;
-      padding: 10px;
-      border-radius: 20px;
-      font-weight: bold;
-      font-size: 0.9rem;
-      background-color: #2a2a2a;
-      color: #aaa;
-      transition: all 0.3s ease;
-    }
-    .status-bar.listening {
-      background-color: #004d40;
-      color: #80cbc4;
-      box-shadow: 0 0 12px rgba(0, 230, 118, 0.3);
-    }
-    .status-bar.speaking {
-      background-color: #4a148c;
-      color: #e1bee7;
-      box-shadow: 0 0 12px rgba(171, 71, 188, 0.3);
-    }
-    .btn-toggle {
-      padding: 14px;
-      border: none;
-      border-radius: 30px;
-      font-size: 1rem;
-      font-weight: bold;
-      cursor: pointer;
-      background: #00e676;
-      color: #000;
-      transition: transform 0.1s, background 0.2s;
-    }
-    .btn-toggle:active {
-      transform: scale(0.98);
-    }
-    .btn-toggle.active {
-      background: #ff5252;
-      color: #fff;
-    }
-    .log-container {
-      background: #1e1e1e;
-      border-radius: 12px;
-      padding: 16px;
-      height: 350px;
-      overflow-y: auto;
-      border: 1px solid #333;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-    .entry {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-    .user-text {
-      color: #80d8ff;
-      font-size: 1.05rem;
-      word-break: break-all;
-    }
-    .echo-text {
-      color: #b9f6ca;
-      font-size: 0.95rem;
-      padding-left: 16px;
-      border-left: 2px solid #00e676;
-      opacity: 0.85;
-      font-style: italic;
-    }
-    .interim {
-      color: #888;
-      font-style: italic;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Infinity Yamabiko</title>
+    <style>
+        :root {
+            --active-color: #00d2d3;
+            --idle-color: #54a0ff;
+            --bg: #1e272e;
+        }
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: var(--bg);
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .status-badge {
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .status-off { background: #485460; }
+        .status-on { background: var(--active-color); animation: blink 1s infinite; }
+        
+        @keyframes blink {
+            50% { opacity: 0.6; }
+        }
+
+        .display {
+            font-size: 2.5rem;
+            text-align: center;
+            margin: 20px;
+            min-height: 100px;
+            color: var(--active-color);
+            word-break: break-all;
+            padding: 0 20px;
+        }
+
+        #micBtn {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            border: none;
+            background: var(--idle-color);
+            cursor: pointer;
+            box-shadow: 0 0 30px rgba(84, 160, 255, 0.3);
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #micBtn.active {
+            background: var(--active-color);
+            transform: scale(1.1);
+            box-shadow: 0 0 50px rgba(0, 210, 211, 0.6);
+        }
+
+        svg { fill: white; width: 40px; height: 40px; }
+
+        .hint {
+            margin-top: 30px;
+            color: #808e9b;
+            font-size: 0.9rem;
+        }
+    </style>
 </head>
 <body>
 
-<div class="container">
-  <h1>🏔️ やまびこ文字起こし</h1>
-  <div id="status" class="status-bar">停止中</div>
-  <button id="toggleBtn" class="btn-toggle">やまびこ開始</button>
+    <div id="badge" class="status-badge status-off">Standby</div>
+    <div id="display" class="display">Tap to Start</div>
 
-  <div id="log" class="log-container">
-    <div id="interimDisplay" class="interim">ここにリアルタイムで声が入ります...</div>
-  </div>
-</div>
+    <button id="micBtn">
+        <svg viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
+    </button>
+
+    <div class="hint">もう一度押すまで、ずっとあなたのマネをします。</div>
 
 <script>
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const micBtn = document.getElementById('micBtn');
+    const badge = document.getElementById('badge');
+    const display = document.getElementById('display');
 
-  const toggleBtn = document.getElementById('toggleBtn');
-  const statusDiv = document.getElementById('status');
-  const logDiv = document.getElementById('log');
-  const interimDisplay = document.getElementById('interimDisplay');
+    let isListening = false;
 
-  let recognition = null;
-  let isRunning = false;
-  let isSpeaking = false;
+    // 音声認識の設定
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
 
-  if (!SpeechRecognition) {
-    statusDiv.textContent = 'お使いのブラウザは音声認識に対応していません（Chrome / Edge推奨）';
-    toggleBtn.disabled = true;
-  } else {
-    recognition = new SpeechRecognition();
-    recognition.lang = 'ja-JP';
-    recognition.interimResults = true; // リアルタイム認識
-    recognition.continuous = true;
+    recognition.lang = 'en-US'; 
+    recognition.continuous = true; // ずっと聞き続ける設定
+    recognition.interimResults = false;
 
-    recognition.onstart = () => {
-      if (!isSpeaking) {
-        setStatus('listening', '🎤 あなたの声を聞いています...');
-      }
-    };
+    // 音声合成
+    const synth = window.speechSynthesis;
+
+    function echo(text) {
+        const uttr = new SpeechSynthesisUtterance(text);
+        uttr.lang = recognition.lang;
+        uttr.rate = 1.0;
+        uttr.pitch = 1.5; // 少し高めのやまびこボイス
+        synth.speak(uttr);
+    }
 
     recognition.onresult = (event) => {
-      let interimText = '';
-
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const transcript = event.results[i][0].transcript;
-        if (event.results[i].isFinal) {
-          // 判定確定時：ログに追加してやまびこ（読み上げ）を実行
-          addLogEntry(transcript);
-          interimDisplay.textContent = '';
-          triggerEcho(transcript);
-        } else {
-          interimText += transcript;
-        }
-      }
-
-      if (interimText) {
-        interimDisplay.textContent = interimText;
-        logDiv.scrollTop = logDiv.scrollHeight;
-      }
+        const lastIndex = event.results.length - 1;
+        const transcript = event.results[lastIndex][0].transcript;
+        
+        display.textContent = transcript;
+        echo(transcript);
     };
 
-    recognition.onerror = (event) => {
-      if (event.error !== 'no-speech' && event.error !== 'aborted') {
-        console.error('Recognition error:', event.error);
-      }
-    };
-
+    // 万が一エラーで止まっても、ON状態なら再起動する
     recognition.onend = () => {
-      // ユーザーが停止していない、かつ読み上げ中でなければ自動再開
-      if (isRunning && !isSpeaking) {
-        try { recognition.start(); } catch(e) {}
-      }
-    };
-  }
-
-  // やまびこ処理（マイクを一旦止めて読み上げる）
-  function triggerEcho(text) {
-    if (!text.trim()) return;
-
-    isSpeaking = true;
-    recognition.stop(); // 自分の声をマイクが拾わないよう一時停止
-    setStatus('speaking', '🔊 やまびこ返答中...');
-
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'ja-JP';
-    utterance.rate = 1.1;  // やまびこ感を出すため少し早め
-    utterance.pitch = 1.2; // 少し高めの音でやまびこ風に
-
-    utterance.onend = () => {
-      isSpeaking = false;
-      if (isRunning) {
-        setStatus('listening', '🎤 あなたの声を聞いています...');
-        try { recognition.start(); } catch(e) {}
-      } else {
-        setStatus('stopped', '停止中');
-      }
+        if (isListening) {
+            recognition.start();
+        }
     };
 
-    utterance.onerror = () => {
-      isSpeaking = false;
-      if (isRunning) try { recognition.start(); } catch(e) {}
-    };
-
-    window.speechSynthesis.speak(utterance);
-  }
-
-  // ログに結果を追加
-  function addLogEntry(text) {
-    const entry = document.createElement('div');
-    entry.className = 'entry';
-
-    const userLine = document.createElement('div');
-    userLine.className = 'user-text';
-    userLine.textContent = '🗣️ ' + text;
-
-    const echoLine = document.createElement('div');
-    echoLine.className = 'echo-text';
-    echoLine.textContent = '⛰️ ' + text;
-
-    entry.appendChild(userLine);
-    entry.appendChild(echoLine);
-
-    logDiv.insertBefore(entry, interimDisplay);
-    logDiv.scrollTop = logDiv.scrollHeight;
-  }
-
-  function setStatus(state, message) {
-    statusDiv.className = 'status-bar ' + state;
-    statusDiv.textContent = message;
-  }
-
-  // ボタン操作
-  toggleBtn.addEventListener('click', () => {
-    if (isRunning) {
-      isRunning = false;
-      recognition.stop();
-      window.speechSynthesis.cancel();
-      toggleBtn.textContent = 'やまびこ開始';
-      toggleBtn.classList.remove('active');
-      setStatus('stopped', '停止中');
-    } else {
-      isRunning = true;
-      toggleBtn.textContent = 'やまびこ停止';
-      toggleBtn.classList.add('active');
-      try { recognition.start(); } catch(e) {}
-    }
-  });
+    micBtn.addEventListener('click', () => {
+        if (!isListening) {
+            // ONにする
+            isListening = true;
+            recognition.start();
+            micBtn.classList.add('active');
+            badge.textContent = "Listening...";
+            badge.className = "status-badge status-on";
+            display.textContent = "I'm listening...";
+        } else {
+            // OFFにする
+            isListening = false;
+            recognition.stop();
+            synth.cancel();
+            micBtn.classList.remove('active');
+            badge.textContent = "Standby";
+            badge.className = "status-badge status-off";
+            display.textContent = "Stopped";
+        }
+    });
 </script>
-
 </body>
 </html>
