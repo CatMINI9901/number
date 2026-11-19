@@ -3,167 +3,255 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>詐欺電話撃退ジェネレーター</title>
+  <title>やまびこ文字起こし</title>
   <style>
-    *, *::before, *::after {
+    * {
       box-sizing: border-box;
+      margin: 0;
+      padding: 0;
     }
     body {
-      background-color: #0b0c10;
-      color: #c5c6c7;
-      font-family: 'Courier New', Courier, monospace;
+      font-family: system-ui, -apple-system, sans-serif;
+      background-color: #121212;
+      color: #e0e0e0;
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
       min-height: 100vh;
-      margin: 0;
       padding: 20px;
     }
     .container {
-      background: #1f2833;
-      border: 1px solid #45a29e;
-      border-radius: 8px;
-      padding: 30px;
-      max-width: 480px;
       width: 100%;
-      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.7);
-      text-align: center;
+      max-width: 600px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
     }
     h1 {
-      color: #66fcf1;
       font-size: 1.4rem;
-      margin-top: 0;
-      margin-bottom: 20px;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      border-bottom: 1px solid #45a29e;
-      padding-bottom: 10px;
+      text-align: center;
+      color: #00e676;
     }
-    p {
-      font-size: 0.85rem;
-      color: #c5c6c7;
-      line-height: 1.5;
-      margin-bottom: 25px;
+    .status-bar {
+      text-align: center;
+      padding: 10px;
+      border-radius: 20px;
+      font-weight: bold;
+      font-size: 0.9rem;
+      background-color: #2a2a2a;
+      color: #aaa;
+      transition: all 0.3s ease;
     }
-    button {
-      background: #0b0c10;
-      color: #66fcf1;
-      border: 1px solid #66fcf1;
-      padding: 16px 20px;
+    .status-bar.listening {
+      background-color: #004d40;
+      color: #80cbc4;
+      box-shadow: 0 0 12px rgba(0, 230, 118, 0.3);
+    }
+    .status-bar.speaking {
+      background-color: #4a148c;
+      color: #e1bee7;
+      box-shadow: 0 0 12px rgba(171, 71, 188, 0.3);
+    }
+    .btn-toggle {
+      padding: 14px;
+      border: none;
+      border-radius: 30px;
       font-size: 1rem;
-      font-family: inherit;
       font-weight: bold;
       cursor: pointer;
-      border-radius: 4px;
-      transition: all 0.2s ease;
-      width: 100%;
+      background: #00e676;
+      color: #000;
+      transition: transform 0.1s, background 0.2s;
     }
-    button:hover {
-      background: #66fcf1;
-      color: #0b0c10;
+    .btn-toggle:active {
+      transform: scale(0.98);
     }
-    button.active {
-      background: #c53030;
-      border-color: #fc8181;
+    .btn-toggle.active {
+      background: #ff5252;
       color: #fff;
-      box-shadow: 0 0 12px rgba(252, 129, 129, 0.6);
     }
-    .status {
-      margin-top: 20px;
-      font-size: 0.85rem;
-      color: #45a29e;
-      min-height: 1.5em;
+    .log-container {
+      background: #1e1e1e;
+      border-radius: 12px;
+      padding: 16px;
+      height: 350px;
+      overflow-y: auto;
+      border: 1px solid #333;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .entry {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .user-text {
+      color: #80d8ff;
+      font-size: 1.05rem;
+      word-break: break-all;
+    }
+    .echo-text {
+      color: #b9f6ca;
+      font-size: 0.95rem;
+      padding-left: 16px;
+      border-left: 2px solid #00e676;
+      opacity: 0.85;
+      font-style: italic;
+    }
+    .interim {
+      color: #888;
+      font-style: italic;
     }
   </style>
 </head>
 <body>
 
-  <div class="container">
-    <h1>撃退オーディオ</h1>
-    <p>ボタンを押すと、ヒンディー語風の不気味な唱え声がランダムな組み合わせと間隔で再生され続けます。</p>
-    
-    <button id="togglePlayBtn">音声再生を開始</button>
+<div class="container">
+  <h1>🏔️ やまびこ文字起こし</h1>
+  <div id="status" class="status-bar">停止中</div>
+  <button id="toggleBtn" class="btn-toggle">やまびこ開始</button>
 
-    <div class="status" id="statusText">待機中</div>
+  <div id="log" class="log-container">
+    <div id="interimDisplay" class="interim">ここにリアルタイムで声が入ります...</div>
   </div>
+</div>
 
-  <script>
-    const synth = window.speechSynthesis;
-    const togglePlayBtn = document.getElementById('togglePlayBtn');
-    const statusText = document.getElementById('statusText');
+<script>
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-    let isPlaying = false;
-    let timerId = null;
+  const toggleBtn = document.getElementById('toggleBtn');
+  const statusDiv = document.getElementById('status');
+  const logDiv = document.getElementById('log');
+  const interimDisplay = document.getElementById('interimDisplay');
 
-    const syllables = [
-      "アタル ヴァカル ナマハ",
-      "ブラマ カパラ ダーラナ",
-      "サンハラ ヴァジュラ スートラ",
-      "タパ スヴァーハー ラーフ",
-      "ケーテュ ダーラ チャクラ",
-      "マントラ ヤーナ アグニ",
-      "ヴィシュヌ ターラ シャクティ",
-      "カーラ タイム ケーララ",
-      "ドゥルガ バフラ プリヤ",
-      "オーム ナモー ヴァルナ"
-    ];
+  let recognition = null;
+  let isRunning = false;
+  let isSpeaking = false;
 
-    function generatePseudoHindi() {
-      const count = Math.floor(Math.random() * 3) + 2;
-      let result = [];
-      for (let i = 0; i < count; i++) {
-        const randomIndex = Math.floor(Math.random() * syllables.length);
-        result.push(syllables[randomIndex]);
+  if (!SpeechRecognition) {
+    statusDiv.textContent = 'お使いのブラウザは音声認識に対応していません（Chrome / Edge推奨）';
+    toggleBtn.disabled = true;
+  } else {
+    recognition = new SpeechRecognition();
+    recognition.lang = 'ja-JP';
+    recognition.interimResults = true; // リアルタイム認識
+    recognition.continuous = true;
+
+    recognition.onstart = () => {
+      if (!isSpeaking) {
+        setStatus('listening', '🎤 あなたの声を聞いています...');
       }
-      return result.join(" ... ");
-    }
+    };
 
-    function speakNext() {
-      if (!isPlaying) return;
+    recognition.onresult = (event) => {
+      let interimText = '';
 
-      const text = generatePseudoHindi();
-      const utterance = new SpeechSynthesisUtterance(text);
-
-      utterance.lang = 'hi-IN';
-      utterance.pitch = 0.45 + Math.random() * 0.25;
-      utterance.rate = 0.65 + Math.random() * 0.2;
-
-      utterance.onstart = () => {
-        if (isPlaying) statusText.textContent = "発唱中...";
-      };
-
-      utterance.onend = () => {
-        if (!isPlaying) return;
-        statusText.textContent = "待機中（不気味な間）...";
-        const delay = Math.floor(Math.random() * 2500) + 1000;
-        timerId = setTimeout(speakNext, delay);
-      };
-
-      utterance.onerror = () => {
-        if (isPlaying) {
-          timerId = setTimeout(speakNext, 2000);
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          // 判定確定時：ログに追加してやまびこ（読み上げ）を実行
+          addLogEntry(transcript);
+          interimDisplay.textContent = '';
+          triggerEcho(transcript);
+        } else {
+          interimText += transcript;
         }
-      };
-
-      synth.speak(utterance);
-    }
-
-    togglePlayBtn.addEventListener('click', () => {
-      isPlaying = !isPlaying;
-
-      if (isPlaying) {
-        togglePlayBtn.textContent = "音声再生を停止";
-        togglePlayBtn.classList.add('active');
-        speakNext();
-      } else {
-        togglePlayBtn.textContent = "音声再生を開始";
-        togglePlayBtn.classList.remove('active');
-        statusText.textContent = "停止しました";
-        if (timerId) clearTimeout(timerId);
-        synth.cancel();
       }
-    });
-  </script>
+
+      if (interimText) {
+        interimDisplay.textContent = interimText;
+        logDiv.scrollTop = logDiv.scrollHeight;
+      }
+    };
+
+    recognition.onerror = (event) => {
+      if (event.error !== 'no-speech' && event.error !== 'aborted') {
+        console.error('Recognition error:', event.error);
+      }
+    };
+
+    recognition.onend = () => {
+      // ユーザーが停止していない、かつ読み上げ中でなければ自動再開
+      if (isRunning && !isSpeaking) {
+        try { recognition.start(); } catch(e) {}
+      }
+    };
+  }
+
+  // やまびこ処理（マイクを一旦止めて読み上げる）
+  function triggerEcho(text) {
+    if (!text.trim()) return;
+
+    isSpeaking = true;
+    recognition.stop(); // 自分の声をマイクが拾わないよう一時停止
+    setStatus('speaking', '🔊 やまびこ返答中...');
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'ja-JP';
+    utterance.rate = 1.1;  // やまびこ感を出すため少し早め
+    utterance.pitch = 1.2; // 少し高めの音でやまびこ風に
+
+    utterance.onend = () => {
+      isSpeaking = false;
+      if (isRunning) {
+        setStatus('listening', '🎤 あなたの声を聞いています...');
+        try { recognition.start(); } catch(e) {}
+      } else {
+        setStatus('stopped', '停止中');
+      }
+    };
+
+    utterance.onerror = () => {
+      isSpeaking = false;
+      if (isRunning) try { recognition.start(); } catch(e) {}
+    };
+
+    window.speechSynthesis.speak(utterance);
+  }
+
+  // ログに結果を追加
+  function addLogEntry(text) {
+    const entry = document.createElement('div');
+    entry.className = 'entry';
+
+    const userLine = document.createElement('div');
+    userLine.className = 'user-text';
+    userLine.textContent = '🗣️ ' + text;
+
+    const echoLine = document.createElement('div');
+    echoLine.className = 'echo-text';
+    echoLine.textContent = '⛰️ ' + text;
+
+    entry.appendChild(userLine);
+    entry.appendChild(echoLine);
+
+    logDiv.insertBefore(entry, interimDisplay);
+    logDiv.scrollTop = logDiv.scrollHeight;
+  }
+
+  function setStatus(state, message) {
+    statusDiv.className = 'status-bar ' + state;
+    statusDiv.textContent = message;
+  }
+
+  // ボタン操作
+  toggleBtn.addEventListener('click', () => {
+    if (isRunning) {
+      isRunning = false;
+      recognition.stop();
+      window.speechSynthesis.cancel();
+      toggleBtn.textContent = 'やまびこ開始';
+      toggleBtn.classList.remove('active');
+      setStatus('stopped', '停止中');
+    } else {
+      isRunning = true;
+      toggleBtn.textContent = 'やまびこ停止';
+      toggleBtn.classList.add('active');
+      try { recognition.start(); } catch(e) {}
+    }
+  });
+</script>
+
 </body>
 </html>
